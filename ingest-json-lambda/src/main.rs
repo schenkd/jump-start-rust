@@ -2,11 +2,37 @@ mod helpers;
 
 use aws_lambda_events::event::kinesis::KinesisEvent;
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
+use serde::{Deserialize, Serialize};
+use serde_json::{json};
+use chrono::{DateTime, Utc};
 
-async fn function_handler(event: LambdaEvent<KinesisEvent>) -> Result<(), Error> {
-    // Extract some useful information from the request
 
-    Ok(())
+#[derive(Serialize, Deserialize, Debug)]
+struct EventMetadata {
+    event_id: String,
+    event_ts: DateTime<Utc>,
+    event_type: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Event {
+    metadata: EventMetadata,
+    username: String,
+    user_agent: String,
+    email: String,
+    ip_address: String,
+}
+
+async fn function_handler(event: LambdaEvent<KinesisEvent>) -> Result<serde_json::Value, Error> {
+    let (event, _context) = event.into_parts();
+
+    let events: Vec<Event> = event.records.into_iter().map(|kinesis_event_record| {
+        serde_json::from_slice(&kinesis_event_record.kinesis.data.as_slice()).unwrap()
+    }).collect();
+
+    print!("{:?}", events);
+
+    Ok(json!({"statusCode": 200}))
 }
 
 #[tokio::test]
